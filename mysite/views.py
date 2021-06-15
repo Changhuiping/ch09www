@@ -11,6 +11,8 @@ from django.contrib import messages
 from django.contrib.auth import authenticate
 from django.contrib import auth
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+
 # Create your views here.
 # def index(request):
 #     years = range(1960,2021)
@@ -31,9 +33,14 @@ from django.contrib.auth.decorators import login_required
 def index(request, pid=None, del_pass=None):
     if request.user.is_authenticated:
         username = request.user.username
+        useremail = request.user.email
+        try:
+            user = models.User.objects.get(username=username)
+            diaries = models.Diary.objects.filter(user=user).order_by('-ddate')
+        except:
+            pass
     messages.get_messages(request)
     return render(request, 'index.html', locals())
-
 def login(request):
     if request.method == 'POST':
         login_form = forms.LoginForm(request.POST)
@@ -67,12 +74,27 @@ def listing(request):
     return render(request, 'listing.html', locals())
 
 
+@login_required(login_url='/login/')
 def posting(request):
-    moods = models.Mood.objects.all()
-    message = '如要張貼訊息，則每一個欄位都要填...'
+    if request.user.is_authenticated:
+        username = request.user.username
+        useremail = request.user.email
+    messages.get_messages(request)
+
+    if request.method == 'POST':
+        user = User.objects.get(username=username)
+        diary = models.Diary(user=user)
+        post_form = forms.DiaryForm(request.POST, instance=diary)
+        if post_form.is_valid():
+            messages.add_message(request, messages.INFO, '日記已儲存')
+            post_form.save()
+            return HttpResponseRedirect('/')
+        else:
+            messages.add_message(request, messages.INFO, '要張貼日記，每一個欄位都要填....')
+    else:
+        post_form = forms.DiaryForm()
+        messages.add_message(request, messages.INFO, '要張貼日記，每一個欄位都要填....')
     return render(request, 'posting.html', locals())
-
-
 def contact(request):
     if request.method == 'POST':
         form = forms.ContactForm(request.POST)
@@ -136,13 +158,15 @@ def post2db(request):
     return render(request, 'post2db.html', locals())
 
 
+
+
 @login_required(login_url='/login/')
 def userinfo(request):
     if request.user.is_authenticated:
         username = request.user.username
     try:
-        userinfo = models.User.objects.get(name=username)
+        user = User.objects.get(username=username)
+        userinfo = models.Profile.objects.get(user=user)
     except:
         pass
-
     return render(request, 'userinfo.html', locals())
